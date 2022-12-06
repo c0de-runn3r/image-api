@@ -20,8 +20,9 @@ import (
 	"github.com/nfnt/resize"
 )
 
-const (
-	initDirName = "images"
+var (
+	StoragePath    string
+	AllowedFileExt = []string{".jpg", ".jpeg", ".png", ".gif"}
 )
 
 type Image struct {
@@ -32,72 +33,37 @@ type Image struct {
 func UploadImage(c echo.Context) error {
 	log.Println("got new image upload request")
 
-	_, err := os.ReadDir(initDirName)
-	if err != nil {
-		if err := os.Mkdir(initDirName, 0755); err != nil {
-			log.Panicln("error occured creating directory", err)
-		}
-	}
-
-	file, err := c.FormFile("image")
-	if err != nil {
-		log.Printf("error occured uploading file: %e", err)
-	}
-
-	fileExtension := filepath.Ext(file.Filename)
-	if fileExtension != ".jpg" && fileExtension != ".jpeg" && fileExtension != ".png" && fileExtension != ".gif" {
-		return c.HTML(http.StatusUnsupportedMediaType, "<p>Only JPG, JPEG, PNG and GIF formats are allowed!")
-	}
-
-	src, err := file.Open()
-	if err != nil {
-		log.Println("error reading from file", err)
-	}
-	defer src.Close()
-
-	formattedName := fmt.Sprintf("%x_%s", time.Now().UnixMilli(), file.Filename)
-	path := filepath.Join(initDirName, formattedName)
-	dst, err := os.Create(path)
-	if err != nil {
-		log.Println("error creating file", err)
-	}
-	defer dst.Close()
-
-	if _, err = io.Copy(dst, src); err != nil {
-		log.Println("error copying to file", err)
-	}
+	ogrFilename, newFilename := copyFile(c)
 
 	log.Println("file uploaded successfully")
 
-	rand.Seed(time.Now().UnixNano())
-	id := rand.Intn(999_999-100_000) + 100_000
-	idStr := fmt.Sprintf("%v", id)
+	idStr := generateID()
 
-	redis.Redis.AddPair(idStr, formattedName)
+	redis.Redis.AddPair(idStr, newFilename)
 	RMQ.SendMessage(idStr)
-	return c.HTML(http.StatusOK, fmt.Sprintf("<p>Image %s uploaded successfully. ID: %s</p>", file.Filename, idStr))
+
+	return c.HTML(http.StatusOK, fmt.Sprintf("<p>Image %s uploaded successfully. ID: %s</p>", ogrFilename, idStr))
 }
 
 func SendImage(c echo.Context) error {
 	id := c.FormValue("id")
 	quality := c.FormValue("quality")
-	file := redis.Redis.GetValue(id)
+	fileName := redis.Redis.GetValue(id)
 	switch quality {
 	case "100":
-		return c.File(filepath.Join(initDirName, file))
+		return c.File(filepath.Join(StoragePath, fileName))
 	case "75":
-		return c.File(filepath.Join(initDirName, "0.75_"+file))
+		return c.File(filepath.Join(StoragePath, "0.75_"+fileName))
 	case "50":
-		return c.File(filepath.Join(initDirName, "0.5_"+file))
+		return c.File(filepath.Join(StoragePath, "0.5_"+fileName))
 	case "25":
-		return c.File(filepath.Join(initDirName, "0.25_"+file))
+		return c.File(filepath.Join(StoragePath, "0.25_"+fileName))
 	default:
-		return c.File(filepath.Join(initDirName, file))
+		return c.File(filepath.Join(StoragePath, fileName))
 	}
 }
 func ResizeImage(name string, qualityIndex float32) {
-	// os.Chdir("..")
-	path := path.Join(initDirName, name)
+	path := path.Join(StoragePath, name)
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
@@ -113,8 +79,9 @@ func ResizeImage(name string, qualityIndex float32) {
 	height := uint(float32(origHeight) * qualityIndex)
 
 	buffer := resize.Resize(width, height, img, resize.Lanczos3)
+
 	newName := fmt.Sprintf("%v_%s", qualityIndex, name)
-	newPath := filepath.Join(initDirName, newName)
+	newPath := filepath.Join(StoragePath, newName)
 	out, err := os.Create(newPath)
 	if err != nil {
 		log.Fatal(err)
@@ -150,9 +117,62 @@ func OptimizeImages(id string) {
 	ResizeImage(file, 0.25)
 }
 
+func copyFile(c echo.Context) (string, string) {
+	_, err := os.ReadDir(StoragePath)
+	if err != nil {
+		if err := os.Mkdir(StoragePath, 0755); err != nil {
+			log.Panicln("error occured creating directory", err)
+		}
+	}
+
+	file, err := c.FormFile("image")
+	if err != nil {
+		log.Printf("error occured uploading file: %e", err)
+	}
+
+	if !checkExtention(file.Filename) {
+		c.HTML(http.StatusUnsupportedMediaType, "<p>Only JPG, JPEG, PNG and GIF formats are allowed!")
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		log.Println("error reading from file", err)
+	}
+	defer src.Close()
+
+	formattedName := fmt.Sprintf("%x_%s", time.Now().UnixMilli(), file.Filename) // to prevent conflicts when two files have the same names
+	path := filepath.Join(StoragePath, formattedName)
+	dst, err := os.Create(path)
+	if err != nil {
+		log.Println("error creating file", err)
+	}
+	defer dst.Close()
+
+	if _, err = io.Copy(dst, src); err != nil {
+		log.Println("error copying to file", err)
+	}
+	return file.Filename, formattedName
+}
+
 func originalSize(file image.Image) (uint, uint) {
 	bounds := file.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
 	return uint(width), uint(height)
+}
+
+func checkExtention(fileName string) bool {
+	fileExtension := filepath.Ext(fileName)
+	for _, v := range AllowedFileExt {
+		if fileExtension == v {
+			return true
+		}
+	}
+	return false
+}
+
+func generateID() string {
+	rand.Seed(time.Now().UnixNano())
+	id := rand.Intn(999_999-100_000) + 100_000
+	return fmt.Sprintf("%v", id)
 }

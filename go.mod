@@ -5,6 +5,7 @@ go 1.19
 require github.com/go-redis/redis/v8 v8.11.5
 
 require (
+	github.com/joho/godotenv v1.4.0 // indirect
 	github.com/labstack/gommon v0.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.11 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect

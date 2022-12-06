@@ -52,7 +52,7 @@ func (r *RabbitMQ) SendMessage(body string) {
 			Body:        []byte(body),
 		})
 	failOnError(err, "Failed to publish a message")
-	log.Printf(" [x] Sent %s\n", body)
+	log.Printf(" [RabbitMQ] Sent %s\n", body)
 }
 
 func (r *RabbitMQ) RecieveMessages() {
