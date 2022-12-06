@@ -26,14 +26,14 @@ func (r *RedisDB) AddPair(id string, name string) {
 	log.Printf("writing to redis [%s:%s]", id, name)
 	err := r.Set(ctx, id, name, 0).Err()
 	if err != nil {
-		panic(err)
+		log.Println("Error writing to redis", err)
 	}
 }
 func (r *RedisDB) GetValue(id string) string {
 	val, err := r.Get(ctx, id).Result()
 	log.Printf("getting from redis [%s:%s]", id, val)
 	if err != nil {
-		panic(err)
+		log.Println("Error getting from redis", err)
 	}
 	return val
 }

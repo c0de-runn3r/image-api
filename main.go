@@ -9,11 +9,11 @@ import (
 	"github.com/labstack/echo"
 )
 
-func setupEndpoints() {
+func startServer() {
 	e := echo.New()
 	e.POST("/upload", utils.UploadImage)
 	e.GET("/download", utils.SendImage)
-	e.File("/index.html", "index.html")
+	e.File("/start", "index.html")
 
 	err := e.Start(":8000")
 	if err != nil {
@@ -30,5 +30,5 @@ func main() {
 
 	go utils.RMQ.RecieveMessages()
 
-	setupEndpoints()
+	startServer()
 }

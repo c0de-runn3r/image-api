@@ -76,6 +76,6 @@ func (r *RabbitMQ) RecieveMessages() {
 		}
 	}()
 
-	log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
+	log.Printf(" [RabbitMQ] Waiting for messages.")
 	<-forever
 }

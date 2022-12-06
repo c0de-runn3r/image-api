@@ -35,7 +35,7 @@ func UploadImage(c echo.Context) error {
 	_, err := os.ReadDir(initDirName)
 	if err != nil {
 		if err := os.Mkdir(initDirName, 0755); err != nil {
-			panic(err)
+			log.Panicln("error occured creating directory", err)
 		}
 	}
 
@@ -45,39 +45,37 @@ func UploadImage(c echo.Context) error {
 	}
 
 	fileExtension := filepath.Ext(file.Filename)
-	if fileExtension == ".jpg" || fileExtension == ".jpeg" || fileExtension == ".png" || fileExtension == ".gif" {
-
-		src, err := file.Open()
-		if err != nil {
-			log.Println(err)
-		}
-		defer src.Close()
-
-		formattedName := fmt.Sprintf("%x_%s", time.Now().UnixMilli(), file.Filename)
-		path := filepath.Join(initDirName, formattedName)
-		dst, err := os.Create(path)
-		if err != nil {
-			log.Println(err)
-		}
-		defer dst.Close()
-
-		if _, err = io.Copy(dst, src); err != nil {
-			log.Println(err)
-		}
-
-		log.Println("file uploaded successfully")
-
-		rand.Seed(time.Now().UnixNano())
-		id := rand.Intn(999_999-100_000) + 100_000
-		idStr := fmt.Sprintf("%v", id)
-
-		redis.Redis.AddPair(idStr, formattedName)
-		RMQ.SendMessage(idStr) // TODO message
-		return c.HTML(http.StatusOK, fmt.Sprintf("<p>Image %s uploaded successfully. ID: %s</p>", file.Filename, idStr))
-	} else {
+	if fileExtension != ".jpg" && fileExtension != ".jpeg" && fileExtension != ".png" && fileExtension != ".gif" {
 		return c.HTML(http.StatusUnsupportedMediaType, "<p>Only JPG, JPEG, PNG and GIF formats are allowed!")
 	}
 
+	src, err := file.Open()
+	if err != nil {
+		log.Println("error reading from file", err)
+	}
+	defer src.Close()
+
+	formattedName := fmt.Sprintf("%x_%s", time.Now().UnixMilli(), file.Filename)
+	path := filepath.Join(initDirName, formattedName)
+	dst, err := os.Create(path)
+	if err != nil {
+		log.Println("error creating file", err)
+	}
+	defer dst.Close()
+
+	if _, err = io.Copy(dst, src); err != nil {
+		log.Println("error copying to file", err)
+	}
+
+	log.Println("file uploaded successfully")
+
+	rand.Seed(time.Now().UnixNano())
+	id := rand.Intn(999_999-100_000) + 100_000
+	idStr := fmt.Sprintf("%v", id)
+
+	redis.Redis.AddPair(idStr, formattedName)
+	RMQ.SendMessage(idStr)
+	return c.HTML(http.StatusOK, fmt.Sprintf("<p>Image %s uploaded successfully. ID: %s</p>", file.Filename, idStr))
 }
 
 func SendImage(c echo.Context) error {
@@ -126,19 +124,19 @@ func ResizeImage(name string, qualityIndex float32) {
 	switch format {
 	case "jpg", "jpeg":
 		if err := jpeg.Encode(out, buffer, nil); err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 	case "png":
 		if err := png.Encode(out, buffer); err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 	case "gif":
 		if err := gif.Encode(out, buffer, nil); err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 	default:
 		if err := jpeg.Encode(out, buffer, nil); err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 	}
 	log.Println("file resized successfully")
