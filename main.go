@@ -2,15 +2,23 @@ package main
 
 import (
 	"log"
-	"net/http"
 
 	"image-api/redis"
 	"image-api/utils"
+
+	"github.com/labstack/echo"
 )
 
 func setupEndpoints() {
-	http.HandleFunc("/upload", utils.UploadImage)
-	http.ListenAndServe(":8000", nil)
+	e := echo.New()
+	e.POST("/upload", utils.UploadImage)
+	e.GET("/download", utils.SendImage)
+	e.File("/index.html", "index.html")
+
+	err := e.Start(":8000")
+	if err != nil {
+		panic(err)
+	}
 }
 
 func main() {

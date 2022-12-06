@@ -29,12 +29,12 @@ func StartRabbitMQ() {
 	failOnError(err, "Failed to open a channel")
 
 	RMQ.Queue, err = RMQ.Channel.QueueDeclare(
-		"imageOptimization", // name
-		false,               // durable
-		false,               // delete when unused
-		false,               // exclusive
-		false,               // no-wait
-		nil,                 // arguments
+		"imageOptimization",
+		false,
+		false,
+		false,
+		false,
+		nil,
 	)
 	failOnError(err, "Failed to declare a queue")
 
@@ -43,10 +43,10 @@ func (r *RabbitMQ) SendMessage(body string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err := r.Channel.PublishWithContext(ctx,
-		"",           // exchange
-		r.Queue.Name, // routing key
-		false,        // mandatory
-		false,        // immediate
+		"",
+		r.Queue.Name,
+		false,
+		false,
 		amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        []byte(body),
@@ -57,13 +57,13 @@ func (r *RabbitMQ) SendMessage(body string) {
 
 func (r *RabbitMQ) RecieveMessages() {
 	msgs, err := r.Channel.Consume(
-		r.Queue.Name, // queue
-		"",           // consumer
-		true,         // auto-ack
-		false,        // exclusive
-		false,        // no-local
-		false,        // no-wait
-		nil,          // args
+		r.Queue.Name,
+		"",
+		true,
+		false,
+		false,
+		false,
+		nil,
 	)
 	failOnError(err, "Failed to register a consumer")
 

@@ -12,9 +12,11 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
+	"github.com/labstack/echo"
 	"github.com/nfnt/resize"
 )
 
@@ -27,44 +29,78 @@ type Image struct {
 	Name string
 }
 
-func UploadImage(wr http.ResponseWriter, req *http.Request) {
+func UploadImage(c echo.Context) error {
 	log.Println("got new image upload request")
-	// req.ParseMultipartForm(32 << 20) // TODO can limit memory of file
 
 	_, err := os.ReadDir(initDirName)
 	if err != nil {
-		os.Mkdir(initDirName, 0755)
+		if err := os.Mkdir(initDirName, 0755); err != nil {
+			panic(err)
+		}
 	}
 
-	file, handler, err := req.FormFile("image")
+	file, err := c.FormFile("image")
 	if err != nil {
 		log.Printf("error occured uploading file: %e", err)
 	}
-	defer file.Close()
 
-	newFile, err := os.CreateTemp(initDirName, "*-"+handler.Filename)
-	if err != nil {
-		log.Println(err)
+	fileExtension := filepath.Ext(file.Filename)
+	if fileExtension == ".jpg" || fileExtension == ".jpeg" || fileExtension == ".png" || fileExtension == ".gif" {
+
+		src, err := file.Open()
+		if err != nil {
+			log.Println(err)
+		}
+		defer src.Close()
+
+		formattedName := fmt.Sprintf("%x_%s", time.Now().UnixMilli(), file.Filename)
+		path := filepath.Join(initDirName, formattedName)
+		dst, err := os.Create(path)
+		if err != nil {
+			log.Println(err)
+		}
+		defer dst.Close()
+
+		if _, err = io.Copy(dst, src); err != nil {
+			log.Println(err)
+		}
+
+		log.Println("file uploaded successfully")
+
+		rand.Seed(time.Now().UnixNano())
+		id := rand.Intn(999_999-100_000) + 100_000
+		idStr := fmt.Sprintf("%v", id)
+
+		redis.Redis.AddPair(idStr, formattedName)
+		RMQ.SendMessage(idStr) // TODO message
+		return c.HTML(http.StatusOK, fmt.Sprintf("<p>Image %s uploaded successfully. ID: %s</p>", file.Filename, idStr))
+	} else {
+		return c.HTML(http.StatusUnsupportedMediaType, "<p>Only JPG, JPEG, PNG and GIF formats are allowed!")
 	}
-	defer newFile.Close()
 
-	fileData, err := io.ReadAll(file)
-	if err != nil {
-		log.Println(err)
-	}
-	newFile.Write(fileData)
-
-	log.Println("file uploaded successfully")
-	rand.Seed(time.Now().UnixNano())
-	id := rand.Intn(999_999-100_000) + 100_000
-	idStr := fmt.Sprintf("%v", id)
-	redis.Redis.AddPair(idStr, newFile.Name())
-	RMQ.SendMessage(idStr) // TODO message
 }
 
-func ResizeImage(nameWithPath string, qualityIndex float32) {
+func SendImage(c echo.Context) error {
+	id := c.FormValue("id")
+	quality := c.FormValue("quality")
+	file := redis.Redis.GetValue(id)
+	switch quality {
+	case "100":
+		return c.File(filepath.Join(initDirName, file))
+	case "75":
+		return c.File(filepath.Join(initDirName, "0.75_"+file))
+	case "50":
+		return c.File(filepath.Join(initDirName, "0.5_"+file))
+	case "25":
+		return c.File(filepath.Join(initDirName, "0.25_"+file))
+	default:
+		return c.File(filepath.Join(initDirName, file))
+	}
+}
+func ResizeImage(name string, qualityIndex float32) {
 	// os.Chdir("..")
-	file, err := os.Open(nameWithPath)
+	path := path.Join(initDirName, name)
+	file, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -77,7 +113,7 @@ func ResizeImage(nameWithPath string, qualityIndex float32) {
 	origWidth, origHeight := originalSize(img)
 	width := uint(float32(origWidth) * qualityIndex)
 	height := uint(float32(origHeight) * qualityIndex)
-	name := filepath.Base(nameWithPath)
+
 	buffer := resize.Resize(width, height, img, resize.Lanczos3)
 	newName := fmt.Sprintf("%v_%s", qualityIndex, name)
 	newPath := filepath.Join(initDirName, newName)
@@ -89,13 +125,21 @@ func ResizeImage(nameWithPath string, qualityIndex float32) {
 
 	switch format {
 	case "jpg", "jpeg":
-		jpeg.Encode(out, buffer, nil)
+		if err := jpeg.Encode(out, buffer, nil); err != nil {
+			panic(err)
+		}
 	case "png":
-		png.Encode(out, buffer)
+		if err := png.Encode(out, buffer); err != nil {
+			panic(err)
+		}
 	case "gif":
-		gif.Encode(out, buffer, nil)
+		if err := gif.Encode(out, buffer, nil); err != nil {
+			panic(err)
+		}
 	default:
-		jpeg.Encode(out, buffer, nil)
+		if err := jpeg.Encode(out, buffer, nil); err != nil {
+			panic(err)
+		}
 	}
 	log.Println("file resized successfully")
 }

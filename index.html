@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ImageUpload</title>
+    <style>
+      .text2cols {
+    white-space: nowrap;
+}
+.text2cols-item {
+    white-space: normal;
+    display: inline-block;
+    width: 48%;
+    vertical-align: top;
+}
+.text2cols .text2cols-item:first-child {
+    margin-right: 4%;
+}
+.radio {
+    display: flex;
+    justify-content: space-between;
+}
+    </style>
+  </head>
+  <body>
+    <div class="text2cols"><div class="text2cols-item">
+    <h1>Upload Image</h1>
+    <form
+      enctype="multipart/form-data"
+      action="http://localhost:8000/upload"
+      method="post"
+    >
+      <input type="file" name="image" />
+      <input type="submit" value="upload" />
+    </form>
+  </div><div class="text2cols-item">
+    <h1>Download Image</h1>
+    <form
+    action="http://localhost:8000/download"
+    method="get"
+  >
+  <label for="id">ID:</label><br>
+<input type="text" id="id" name="id" value=""><br>
+  <input type="radio" class="radio" id="100" name="quality" value="100">
+  <label for="100">100%</label><br>
+  <input type="radio" class="radio" id="75" name="quality" value="75">
+  <label for="75">75%</label><br>
+  <input type="radio" class="radio" id="50" name="quality" value="50">
+  <label for="50">50%</label>
+  <input type="radio" class="radio" id="25" name="quality" value="25">
+  <label for="25">25%</label>
+    <input type="submit" class="radio" value="getImage" />
+  </form>
+</div></div>
+  </body>
+</html>
