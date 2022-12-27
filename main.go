@@ -4,8 +4,10 @@ import (
 	"log"
 	"os"
 
-	"image-api/redis"
-	"image-api/utils"
+	"image-api/queue"
+	"image-api/resizer"
+	"image-api/server"
+	"image-api/storage"
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo"
@@ -13,8 +15,8 @@ import (
 
 func startServer() {
 	e := echo.New()
-	e.POST("/upload", utils.UploadImage)
-	e.GET("/download", utils.SendImage)
+	e.POST("/upload", server.HandleUploadImage)
+	e.GET("/download", server.HandleSendImage)
 	e.File("/start", "index.html")
 
 	err := e.Start(":8000")
@@ -33,15 +35,19 @@ func processENV() (storagePath string) {
 }
 
 func main() {
-	utils.StoragePath = processENV()
+	resizer.StoragePath = processENV()
 
 	log.Println("service started")
 
-	redis.SetupRedisClient()
+	storage := storage.NewStorageClient(storage.NewRedisClient())
 
-	utils.StartRabbitMQ()
+	resizer := resizer.Resize{}
 
-	go utils.RMQ.RecieveMessages()
+	queue := queue.NewQueueClient(queue.NewRabbitMQ())
+
+	server.InitializeModules(storage, resizer, queue)
+
+	go server.HandleMessages()
 
 	startServer()
 }
