@@ -4,7 +4,6 @@
 To use the server API you need:
 - Installed and running RabbitMQ (default port :5672)
 - Installed and running Redis (default port :6379)
-- Setup environmental variables or make .env file (as in example) 
 - run main.go
 
 ## Supported requests:

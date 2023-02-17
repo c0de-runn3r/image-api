@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"log"
-	"os"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -14,9 +13,9 @@ type RedisDB struct {
 
 var ctx = context.Background()
 
-func NewRedisClient() *RedisDB {
+func NewRedisClient(addr string) *RedisDB {
 	client := *redis.NewClient(&redis.Options{
-		Addr:     os.Getenv("REDIS"),
+		Addr:     addr,
 		Password: "",
 		DB:       0,
 	})

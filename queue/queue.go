@@ -3,7 +3,6 @@ package queue
 import (
 	"context"
 	"log"
-	"os"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -20,8 +19,8 @@ func failOnError(err error, msg string) {
 	}
 }
 
-func NewRabbitMQ() *RabbitMQ {
-	conn, err := amqp.Dial(os.Getenv("RABBIT_MQ"))
+func NewRabbitMQ(addr string) *RabbitMQ {
+	conn, err := amqp.Dial(addr)
 	failOnError(err, "Failed to connect to RabbitMQ")
 
 	channel, err := conn.Channel()
